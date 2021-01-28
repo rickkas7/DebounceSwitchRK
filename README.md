@@ -1,2 +1,5 @@
 # DebounceSwitchRK
-Library for debouncing switches on Particle  devices
+
+Library for switch debouncing for Particle devices
+
+
