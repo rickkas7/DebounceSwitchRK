@@ -36,6 +36,7 @@ If you are designing a new circuit, the best option is to have your switch conne
 ### Callbacks
 
 This library uses a thread and a callback approach. Even if the GPIO are polled (as is typically
+the case for hardware GPIO connected to the MCU), you will be notified of debounced press and tap
 events using a callback.
 
 The callback has this prototype:
