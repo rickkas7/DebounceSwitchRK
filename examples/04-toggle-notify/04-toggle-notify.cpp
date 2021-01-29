@@ -6,20 +6,19 @@ SYSTEM_THREAD(ENABLED);
 
 SerialLogHandler logHandler;
 
-DebounceSwitch debounce;
-
 void interruptHandler();
 DebounceSwitchState *notifyHandler;
 
 void setup() {
-    waitFor(Serial.isConnected, 15000);
+    // Comment this out to wait for USB serial connections to see more debug logs
+    // waitFor(Serial.isConnected, 15000);
 
-    debounce.setup();
+    DebounceSwitch::getInstance()->setup();
 
     pinMode(D2, INPUT_PULLUP);
     attachInterrupt(D2, interruptHandler, CHANGE);
 
-    notifyHandler = debounce.addNotifySwitch(DebounceSwitchStyle::TOGGLE, [](DebounceSwitchState *switchState, void *) {
+    notifyHandler = DebounceSwitch::getInstance()->addNotifySwitch(DebounceSwitchStyle::TOGGLE, [](DebounceSwitchState *switchState, void *) {
         Log.info("state=%s", switchState->getPressStateName());
     });
 

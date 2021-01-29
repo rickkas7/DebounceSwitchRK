@@ -6,25 +6,26 @@ SYSTEM_THREAD(ENABLED);
 
 SerialLogHandler logHandler;
 
-DebounceSwitch debounce;
-
 void interruptHandler();
 DebounceSwitchState *notifyHandler;
 
+pin_t TEST_PIN = D3;
+
 void setup() {
-    waitFor(Serial.isConnected, 15000);
+    // Comment this out to wait for USB serial connections to see more debug logs
+    // waitFor(Serial.isConnected, 15000);
 
-    debounce.setup();
+    DebounceSwitch::getInstance()->setup();
 
-    pinMode(D2, INPUT_PULLUP);
-    attachInterrupt(D2, interruptHandler, CHANGE);
+    pinMode(TEST_PIN, INPUT_PULLUP);
+    attachInterrupt(TEST_PIN, interruptHandler, CHANGE);
 
-    notifyHandler = debounce.addNotifySwitch(DebounceSwitchStyle::PRESS_LOW, [](DebounceSwitchState *switchState, void *) {
-        Log.info("pin=%d state=%s", switchState->getPin(), switchState->getPressStateName());
+    notifyHandler = DebounceSwitch::getInstance()->addSwitch(DebounceSwitch::NOTIFY_PIN, DebounceSwitchStyle::PRESS_LOW, [](DebounceSwitchState *switchState, void *) {
+        Log.info("state=%s", switchState->getPressStateName());
+        if (switchState->getPressState() == DebouncePressState::TAP) {
+            Log.info("%d taps", switchState->getTapCount());
+        }
     });
-
-    // Notify of initial state
-    notifyHandler->notify(pinReadFast(D2));
 
 }
 
@@ -34,6 +35,6 @@ void loop() {
 void interruptHandler() {
     // It's safe to call this from an ISR
     if (notifyHandler) {
-        notifyHandler->notify(pinReadFast(D2));
+        notifyHandler->notify(pinReadFast(TEST_PIN));
     }
 }

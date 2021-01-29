@@ -7,7 +7,6 @@ SYSTEM_THREAD(ENABLED);
 
 SerialLogHandler logHandler;
 
-DebounceSwitch debounce;
 MCP23008 gpio(Wire3, 0x20);
 
 pin_t GPIO_INT_PIN = A3;
@@ -17,7 +16,7 @@ uint16_t SWITCH_PIN = 2; // GP2
 void setup() {
     waitFor(Serial.isConnected, 15000);
 
-    debounce.setup();
+    DebounceSwitch::getInstance()->setup();
 
     // Turn on power on Tracker CAN_5V
     pinMode(CAN_PWR, OUTPUT);
@@ -33,10 +32,13 @@ void setup() {
 
     gpio.pinMode(SWITCH_PIN, INPUT_PULLUP);
 
-    DebounceSwitchState *sw = debounce.addNotifySwitch(DebounceSwitchStyle::PRESS_LOW, 
+    DebounceSwitchState *sw = DebounceSwitch::getInstance()->addNotifySwitch(DebounceSwitchStyle::PRESS_LOW, 
         [](DebounceSwitchState *switchState, void *) {
             // Called to notify of switch operations
             Log.info("pin=%d state=%s", switchState->getPin(), switchState->getPressStateName());
+            if (switchState->getPressState() == DebouncePressState::TAP) {
+                Log.info("%d taps", switchState->getTapCount());
+            }
         }, NULL);
 
     gpio.attachInterrupt(SWITCH_PIN, CHANGE, [sw](bool bValue) {

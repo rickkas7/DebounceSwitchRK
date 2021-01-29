@@ -7,13 +7,12 @@ SYSTEM_THREAD(ENABLED);
 
 SerialLogHandler logHandler;
 
-DebounceSwitch debounce;
 MCP23008 gpio(Wire3, 0x20);
 
 void setup() {
     waitFor(Serial.isConnected, 15000);
 
-    debounce.setup();
+    DebounceSwitch::getInstance()->setup();
 
     // Turn on power on Tracker CAN_5V
     pinMode(CAN_PWR, OUTPUT);
@@ -24,10 +23,13 @@ void setup() {
     gpio.begin();
     gpio.pinMode(2, INPUT_PULLUP);
 
-    debounce.addVirtualSwitch(DebounceSwitchStyle::PRESS_LOW, 
+    DebounceSwitch::getInstance()->addVirtualSwitch(DebounceSwitchStyle::PRESS_LOW, 
         [](DebounceSwitchState *switchState, void *) {
             // Called to notify of switch operations
             Log.info("pin=%d state=%s", switchState->getPin(), switchState->getPressStateName());
+            if (switchState->getPressState() == DebouncePressState::TAP) {
+                Log.info("%d taps", switchState->getTapCount());
+            }
         }, NULL,
         [](DebounceSwitchState *switchState, void *) {
             // Called to poll for values

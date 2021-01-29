@@ -6,16 +6,17 @@ SYSTEM_THREAD(ENABLED);
 
 SerialLogHandler logHandler;
 
-DebounceSwitch debounce;
+void toggleSwitchCallback(DebounceSwitchState *switchState, void *context) {
+    Log.info("state=%s", switchState->getPressStateName());
+}
 
 void setup() {
-    waitFor(Serial.isConnected, 15000);
+    // Comment this out to wait for USB serial connections to see more debug logs
+    // waitFor(Serial.isConnected, 15000);
 
-    debounce.setup();
+    DebounceSwitch::getInstance()->setup();
 
-    debounce.addSwitch(D2, DebounceSwitchStyle::TOGGLE_PULLUP, [](DebounceSwitchState *switchState, void *) {
-        Log.info("state=%s", switchState->getPressStateName());
-    });
+    DebounceSwitch::getInstance()->addSwitch(D2, DebounceSwitchStyle::TOGGLE_PULLUP, toggleSwitchCallback);
 }
 
 void loop() {

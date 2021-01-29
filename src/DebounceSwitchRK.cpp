@@ -3,9 +3,16 @@
 // [static] 
 DebounceSwitch *DebounceSwitch::instance = 0;
 
+// [static]
+DebounceSwitch *DebounceSwitch::getInstance() { 
+    if (!instance) {
+        instance = new DebounceSwitch();
+    }
+    return instance; 
+};
+
 
 DebounceSwitch::DebounceSwitch() {
-    instance = this;
 }
     
 DebounceSwitch::~DebounceSwitch() {
@@ -19,7 +26,9 @@ DebounceSwitch::~DebounceSwitch() {
 }
 
 void DebounceSwitch::setup() {
-    new Thread("debounce", threadFunctionStatic, this, OS_THREAD_PRIORITY_DEFAULT, stackSize);
+    if (thread == NULL) {
+        thread = new Thread("debounce", threadFunctionStatic, this, OS_THREAD_PRIORITY_DEFAULT, stackSize);
+    }
 }
 
 void DebounceSwitch::threadFunction() {
@@ -48,13 +57,14 @@ os_thread_return_t DebounceSwitch::threadFunctionStatic(void* param) {
 }
 
 DebounceSwitchState *DebounceSwitch::addSwitch(pin_t pin, DebounceSwitchStyle style, std::function<void(DebounceSwitchState *switchState, void *context)> callback, void *context, std::function<bool(DebounceSwitchState *switchState, void *pollContext)> pollCallback, void *pollContext) {
-
-    if (pollCallback == NULL) {
-        pollCallback = gpioPoll;
-        pollContext = 0;
-    }
-    if (pin < FIRST_VIRTUAL_PIN) {
+    
+    if (pin < VIRTUAL_PIN) {
         // Real GPIO
+        if (pollCallback == NULL) {
+            pollCallback = gpioPoll;
+            pollContext = 0;
+        }
+
         switch(style) {
         case DebounceSwitchStyle::PRESS_LOW:
         case DebounceSwitchStyle::PRESS_HIGH:
@@ -79,34 +89,23 @@ DebounceSwitchState *DebounceSwitch::addSwitch(pin_t pin, DebounceSwitchStyle st
         return NULL;
     }
 
-    switchStates.push_back(state);
+    if (pin == NOTIFY_PIN) {
+        switch(style) {
+        case DebounceSwitchStyle::PRESS_LOW:
+        case DebounceSwitchStyle::PRESS_LOW_PULLUP:
+            // Initial state should be high, not low
+            state->notify(true);
+            break;
 
-    return state;
-}
-
-DebounceSwitchState *DebounceSwitch::addNotifySwitch(DebounceSwitchStyle style, std::function<void(DebounceSwitchState *switchState, void *context)> callback, void *context) {
-
-    DebounceSwitchState *state = new DebounceSwitchState(nextVirtualPin++, style, callback, context, 0, 0);
-    if (!state) {
-        return NULL;
-    }
-
-    switch(style) {
-    case DebounceSwitchStyle::PRESS_LOW:
-    case DebounceSwitchStyle::PRESS_LOW_PULLUP:
-        // Initial state should be high, not low
-        state->notify(true);
-        break;
-
-    default:
-        break;
+        default:
+            break;
+        }
     }
 
     switchStates.push_back(state);
 
     return state;
 }
-
 
 
 // [static]
@@ -234,26 +233,8 @@ void DebounceSwitchState::run() {
     case DebouncePressState::RELEASED:
         if ((millis() - releaseMs) >= DebounceSwitch::getInstance()->getInterTapMs()) {
             // Send out the total number of taps
-            switch(sequenceCount) {
-            case 0:
-                // This occurs with a single LONG or VERY_LONG press
-                break;
-
-            case 1:
-                setPressState(DebouncePressState::TAP_1, true);
-                break;
-
-            case 2:
-                setPressState(DebouncePressState::TAP_2, true);
-                break;
-
-            case 3:
-                setPressState(DebouncePressState::TAP_3, true);
-                break;
-
-            default:
-                setPressState(DebouncePressState::TAP_MANY, true);
-                break;
+            if (sequenceCount > 0) {
+                setPressState(DebouncePressState::TAP, true);
             }
 
             setPressState(DebouncePressState::NOT_PRESSED, false);
@@ -333,17 +314,8 @@ const char *DebounceSwitchState::getPressStateName(DebouncePressState pressState
     case DebouncePressState::RELEASED:
         return "RELEASED";
 
-    case DebouncePressState::TAP_1:
-        return "TAP_1";
-
-    case DebouncePressState::TAP_2:
-        return "TAP_2";
-
-    case DebouncePressState::TAP_3:
-        return "TAP_3";
-
-    case DebouncePressState::TAP_MANY:
-        return "TAP_MANY";
+    case DebouncePressState::TAP:
+        return "TAP";
 
     case DebouncePressState::TOGGLE_START:
         return "TOGGLE_START";
