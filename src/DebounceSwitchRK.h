@@ -26,7 +26,7 @@ enum class DebounceSwitchStyle {
     PRESS_HIGH,
 
     /**
-     * @brief Momentary switch to GND using the MCU internal pull-up resistor
+     * @brief Momentary switch to GND, along with using the MCU internal pull-up resistor
      * 
      * This is the recommended mode for most circuits that don't already
      * have an external pull resistor.
@@ -34,7 +34,7 @@ enum class DebounceSwitchStyle {
     PRESS_LOW_PULLUP,
 
     /**
-     * @brief Momentary switch to 3V3 using the MCU internal pull-up resistor
+     * @brief Momentary switch to 3V3, along with using the MCU internal pull-up resistor
      */
     PRESS_HIGH_PULLDOWN,
 
@@ -168,6 +168,188 @@ enum class DebouncePressState {
 };
 
 /**
+ * @brief Container for timing-related settings for switches. 
+ * 
+ * These are set per-switch, but you can create one of these objects and set all
+ * of the settings for multiple switches at once if you have a number of identical
+ * switches, for example all momentary switches. If you have a mix of momentary
+ * and toggle switches that require different debounce timing, you can set the
+ * settings independently.
+ */
+class DebounceConfiguration {
+public:
+    /**
+     * @brief Set the debounce press and release time in milliseconds (default: 20)
+     * 
+     * @param ms Value to change to in milliseconds. Reasonable values are 20 to 100.
+     * 
+     * There are also methods to set the press and release time individually.
+     */
+    DebounceConfiguration &withDebounceMs(unsigned long ms) { debouncePressMs = debounceReleaseMs = ms; return *this; };
+
+    /**
+     * @brief Set the debounce press time in milliseconds (default: 20)
+     * 
+     * @param ms Value to change to in milliseconds. Reasonable values are 20 to 100.
+     * 
+     * If the switch is particularly bouncy you can make this larger, but increasing it
+     * also adds to the latency for detecting button presses, so 20 is a good balance.
+     * 
+     * For toggle switches, set debouncePressMs and debounceReleaseMs to be the same value, which
+     * could be a bit larger, possibly even 100 ms for both.
+     */
+    DebounceConfiguration &withDebouncePressMs(unsigned long ms) { debouncePressMs = ms; return *this; };
+
+    /**
+     * @brief Gets the debounce time in milliseconds (default: 20)
+     */
+    unsigned long getDebouncePressMs() const { return debouncePressMs; };
+
+    /**
+     * @brief Set the debounce release time in milliseconds (default: 20)
+     * 
+     * @param ms Value to change to in milliseconds. Reasonable values are 20 to 100.
+     * 
+     * The minimum is around 10 ms. It should not be larger than 100 milliseconds as
+     * it affects the latency of detecting button presses. Momentary switches usually
+     * are bouncier on release (because of the spring), so setting it a little higher
+     * may help if you are still seeing bounces.
+     * 
+     * For toggle switches, set debouncePressMs and debounceReleaseMs to be the same value, which
+     * could be a bit larger, possibly even 100 ms for both.
+     */
+    DebounceConfiguration &withDebounceReleaseMs(unsigned long ms) { debouncePressMs = ms; return *this; };
+
+    /**
+     * @brief Gets the debounce time in milliseconds (default: 20)
+     */
+    unsigned long getDebounceReleaseMs() const { return debouncePressMs; };
+
+    /**
+     * @brief Set the inter-tap time in milliseconds (default: 500)
+     * 
+     * @param ms Value to change to in milliseconds. Reasonable values are 250 to 2000.
+     * 
+     * When detecting multiple taps, there needs to be a timeout
+     * from the last release before we know whether it was a single, double, or triple
+     * tap. After the inter-tap timeout occurs, we definitively know that the last tap
+     * has been made and any new tap will start over again at 1.
+     * 
+     * Making this longer makes it easier to double-tap, but it also delays the amount
+     * of time until a TAP is generated.
+     * 
+     * If you are not using double or triple tap, you can ignore this setting and only
+     * respond to the SHORT state instead of TAP. SHORT is generated after each
+     * release without consulting the inter-tap timeout.
+     */
+    DebounceConfiguration &withInterTapMs(unsigned long ms) { interTapMs = ms; return *this; };
+
+    /**
+     * @brief Gets the inter-tap time in milliseconds (default: 500)
+     */
+    unsigned long getInterTapMs() const { return interTapMs; };
+
+    /**
+     * @brief Set the long press duration in milliseconds (default: 3000, 3 seconds)
+     * 
+     * @param ms Value to change to in milliseconds. Reasonable values are 2000 to 6000 or 0 to disable.
+     * 
+     * If the button is held down longer than long press, but shorter than very long
+     * press, then a LONG button state is generated. It also means a SHORT will not
+     * be generated.
+     */
+    DebounceConfiguration &withLongPressMs(unsigned long ms) { longPressMs = ms; return *this; };
+
+    /**
+     * @brief Disables support for long and very long press. Only short press is returned.
+     */ 
+    DebounceConfiguration &withNoLongPress() { longPressMs = 0; return *this; };
+
+    /**
+     * @brief Get the long press duration in milliseconds (default: 3000, 3 seconds)
+     */
+    unsigned long getLongPressMs() const { return longPressMs; };
+
+    /**
+     * @brief Set the very long press duration in milliseconds (default: 10000, 10 seconds)
+     * 
+     * @param ms Value to change to in milliseconds. Reasonable values are 2000 to 15000. 
+     * Also 0 is valid as very long press disabled; see withNoVeryLongPress() or 0 to disable.
+     */
+    DebounceConfiguration &withVeryLongPressMs(unsigned long ms) { veryLongPressMs = ms; return *this; };
+
+    /**
+     * @brief Disables support for very long press
+     * 
+     * By disabling VERY_LONG the states: PRESS_START, LONG, and RELEASED will be sent to the
+     * callback. PROGRESS and VERY_LONG will never be sent. This can simplify your code if
+     * you only need two press states (SHORT and LONG).
+     */
+    DebounceConfiguration &withNoVeryLongPress() { veryLongPressMs = 0; return *this; };
+
+    /**
+     * @brief Gets the very long press duration in milliseconds (default: 10000, 10 seconds)
+     */
+    unsigned long getVeryLongPressMs() const { return veryLongPressMs; };
+
+    /**
+     * @brief Copy settings from another DebounceConfiguration
+     * 
+     * @param src The settings to copy from
+     */
+    DebounceConfiguration &operator=(const DebounceConfiguration &src);
+
+protected:
+    /**
+     * @brief Debounce period for press in milliseconds (default: 20)
+     * 
+     * The minimum is around 10 ms. It should not be larger than 100 milliseconds as
+     * it affects the latency of detecting button presses. 
+     * 
+     * For toggle switches, set debouncePressMs and debounceReleaseMs to be the same value, which
+     * could be a bit larger, possibly even 100 ms for both.
+     */
+    unsigned long debouncePressMs = 20;
+
+    /**
+     * @brief Debounce period for release in milliseconds (default: 20)
+     * 
+     * The minimum is around 10 ms. It should not be larger than 100 milliseconds as
+     * it affects the latency of detecting button presses. Momentary switches usually
+     * are bouncier on release (because of the spring), so setting it a little higher
+     * may help if you are still seeing bounces.
+     * 
+     * For toggle switches, set debouncePressMs and debounceReleaseMs to be the same value, which
+     * could be a bit larger, possibly even 100 ms for both.
+     */
+    unsigned long debounceReleaseMs = 20;
+
+    /**
+     * @brief How long to wait for double-tap, triple-tap, etc. in milliseconds (default: 500)
+     * 
+     * Making this short reduces the latency until the TAP event is generated. However, it
+     * makes it harder to multi-tap as you have less time between release and the next press.
+     * Making it too long causes the TAP event to be very delayed, and also causes extraneous
+     * multi-taps. 500 (1/2 second) feels about right to me. 
+     */
+    unsigned long interTapMs = 500;
+
+    /**
+     * @brief How long to wait for a long press in milliseconds (default: 3000, or 3 seconds)
+     * 
+     * Set to 0 to disable longPress and veryLongPress. 
+     */
+    unsigned long longPressMs = 3000;
+
+    /**
+     * @brief How long to wait for a very long press in milliseconds (default: 10000, or 10 seconds)
+     * 
+     * Set to 0 to disable veryLongPress. 
+     */
+    unsigned long veryLongPressMs = 10000;
+};
+
+/**
  * @brief Configuration and state for a single switch
  * 
  * The DebounceSwitch class has one global singleton instance, but there's an instance of 
@@ -177,7 +359,7 @@ enum class DebouncePressState {
  * You do not instantate these directly, the methods in DebounceSwitch such as 
  * addSwitch(), addVirtualSwitch(), and addNotifySwitch() will instantiate it for you.
  */
-class DebounceSwitchState {
+class DebounceSwitchState : public DebounceConfiguration {
 
 public:    
     /**
@@ -243,6 +425,20 @@ public:
     pin_t getPin() const { return pin; };
 
     /**
+     * @brief Sets the configuration for this switch
+     * 
+     * @param config a A DebounceConfiguration object with the settings you want to use
+     * 
+     * This method is handy if you want to share the same configuration across several switches
+     * instead of calling methods like withDebouncePressMs() individually for each switch.
+     * The settings are copied from config.
+     */
+    DebounceSwitchState &withConfig(const DebounceConfiguration &config) {
+        *(DebounceConfiguration *)this = config;
+        return *this;
+    }
+
+    /**
      * @brief Converts a signal value (false = LOW, true = HIGH) to a DebouncePressState
      * 
      * @param signal the value to convert
@@ -270,6 +466,8 @@ protected:
      * 
      * @param style The style of button (push button or toggle), with or without pull-up or pull-down.
      * 
+     * @param config The configuration to use
+     * 
      * @param callback The function to call 
      * 
      * @param context Optional pointer to pass to the callback.
@@ -282,7 +480,7 @@ protected:
      * Do not instantate this directly, the methods in DebounceSwitch such as 
      * addSwitch(), addVirtualSwitch(), and addNotifySwitch() will instantiate it for you.
      */
-    DebounceSwitchState(pin_t pin, DebounceSwitchStyle style, std::function<void(DebounceSwitchState *switchState, void *context)> callback, void *context, std::function<bool(DebounceSwitchState *switchState, void *pollContext)> pollCallback, void *pollContext);
+    DebounceSwitchState(pin_t pin, DebounceSwitchStyle style, DebounceConfiguration *config, std::function<void(DebounceSwitchState *switchState, void *context)> callback, void *context, std::function<bool(DebounceSwitchState *switchState, void *pollContext)> pollCallback, void *pollContext);
 
     /**
      * @brief Destructor - used internally
@@ -430,7 +628,7 @@ protected:
  * 
  * It uses threads so you do not need to call anything from loop().
  */
-class DebounceSwitch {
+class DebounceSwitch : public DebounceConfiguration {
 public:
     /**
      * @brief This class is a singleton - use getInstance() to get the pointer to the object
@@ -513,7 +711,7 @@ public:
      * has this prototype:
      * 
      * ```
-     * void callback(DebounceSwitchState *switchState);
+     * void YourClass::callback(DebounceSwitchState *switchState);
      * ```
      * 
      * Note that when using a class member function, context is not used; if you want to
@@ -554,13 +752,13 @@ public:
      * has this prototype:
      * 
      * ```
-     * void callback(DebounceSwitchState *switchState);
+     * void YourClass::callback(DebounceSwitchState *switchState);
      * ```
      * 
      * And, similarly for pollingCallback, which must return a bool:
      * 
      * ```
-     * bool pollingCallback(DebounceSwitchState *switchState);
+     * bool YourClass::pollingCallback(DebounceSwitchState *switchState);
      * ```
      * 
      * Note that when using a class member function, context is not used; if you want to
@@ -593,89 +791,6 @@ public:
      *  how often to poll the switches in milliseconds (default: 5)
      */
     unsigned long getCheckMs() const { return checkMs; };
-
-    /**
-     * @brief Set the debounce time in milliseconds (default: 20)
-     * 
-     * @param ms Value to change to in milliseconds. Reasonable values are 20 to 100.
-     * 
-     * If the switch is particularly bouncy you can make this larger, but increasing it
-     * also adds to the latency for detecting button presses, so 20 is a good balance.
-     */
-    DebounceSwitch &withDebounceMs(unsigned long ms) { debounceMs = ms; return *this; };
-
-    /**
-     * @brief Gets the debounce time in milliseconds (default: 20)
-     */
-    unsigned long getDebounceMs() const { return debounceMs; };
-
-
-    /**
-     * @brief Set the inter-tap time in milliseconds (default: 500)
-     * 
-     * @param ms Value to change to in milliseconds. Reasonable values are 250 to 2000.
-     * 
-     * When detecting multiple taps, there needs to be a timeout
-     * from the last release before we know whether it was a single, double, or triple
-     * tap. After the inter-tap timeout occurs, we definitively know that the last tap
-     * has been made and any new tap will start over again at 1.
-     * 
-     * Making this longer makes it easier to double-tap, but it also delays the amount
-     * of time until a TAP is generated.
-     * 
-     * If you are not using double or triple tap, you can ignore this setting and only
-     * respond to the SHORT state instead of TAP. SHORT is generated after each
-     * release without consulting the inter-tap timeout.
-     */
-    DebounceSwitch &withInterTapMs(unsigned long ms) { interTapMs = ms; return *this; };
-
-    /**
-     * @brief Gets the inter-tap time in milliseconds (default: 500)
-     */
-    unsigned long getInterTapMs() const { return interTapMs; };
-
-    /**
-     * @brief Set the long press duration in milliseconds (default: 3000, 3 seconds)
-     * 
-     * @param ms Value to change to in milliseconds. Reasonable values are 2000 to 6000.
-     * 
-     * If the button is held down longer than long press, but shorter than very long
-     * press, then a LONG button state is generated. It also means a SHORT will not
-     * be generated.
-     */
-    DebounceSwitch &withLongPressMs(unsigned long ms) { longPressMs = ms; return *this; };
-
-    /**
-     * @brief Gets the long press duration in milliseconds (default: 3000, 3 seconds)
-     */ 
-    DebounceSwitch &withNoLongPress() { longPressMs = 0; return *this; };
-
-    /**
-     * @brief Get the long press duration in milliseconds (default: 3000, 3 seconds)
-     */
-    unsigned long getLongPressMs() const { return longPressMs; };
-
-    /**
-     * @brief Set the very long press duration in milliseconds (default: 10000, 10 seconds)
-     * 
-     * @param ms Value to change to in milliseconds. Reasonable values are 2000 to 15000. 
-     * Also 0 is valid as very long press disabled; see withNoVeryLongPress()
-     */
-    DebounceSwitch &withVeryLongPressMs(unsigned long ms) { veryLongPressMs = ms; return *this; };
-
-    /**
-     * @brief Disables support for very long press
-     * 
-     * By disabling VERY_LONG the states: PRESS_START, LONG, and RELEASED will be sent to the
-     * callback. PROGRESS and VERY_LONG will never be sent. This can simplify your code if
-     * you only need two press states (SHORT and LONG).
-     */
-    DebounceSwitch &withNoVeryLongPress() { veryLongPressMs = 0; return *this; };
-
-    /**
-     * @brief Gets the very long press duration in milliseconds (default: 10000, 10 seconds)
-     */
-    unsigned long getVeryLongPressMs() const { return veryLongPressMs; };
 
     /**
      * @brief Set the stack size for the worker thread (default: 1024 bytes)
@@ -766,40 +881,11 @@ protected:
      * The default value is 5 milliseconds and this should be appropriate in most cases.
      * It can't be larger than 20 milliseconds, and shouldn't be less than 1, and 5 
      * is about right.
+     * 
+     * This must be the same for all switches, but the other parameters like the length
+     * of debounce are configurable on a per-switch basis.
      */
     unsigned long checkMs = 5;
-
-    /**
-     * @brief Debounce period in milliseconds (default: 20)
-     * 
-     * The minimum is around 10 ms. It should not be larger than 100 milliseconds as
-     * it affects the latency of detecting button presses. 
-     */
-    unsigned long debounceMs = 20;
-
-    /**
-     * @brief How long to wait for double-tap, triple-tap, etc. in milliseconds (default: 500)
-     * 
-     * Making this short reduces the latency until the TAP event is generated. However, it
-     * makes it harder to multi-tap as you have less time between release and the next press.
-     * Making it too long causes the TAP event to be very delayed, and also causes extraneous
-     * multi-taps. 500 (1/2 second) feels about right to me. 
-     */
-    unsigned long interTapMs = 500;
-
-    /**
-     * @brief How long to wait for a long press in milliseconds (default: 3000, or 3 seconds)
-     * 
-     * Set to 0 to disable longPress and veryLongPress. 
-     */
-    unsigned long longPressMs = 3000;
-
-    /**
-     * @brief How long to wait for a very long press in milliseconds (default: 10000, or 10 seconds)
-     * 
-     * Set to 0 to disable veryLongPress. 
-     */
-    unsigned long veryLongPressMs = 10000;
 
     /**
      * @brief Thread object for the worker thread

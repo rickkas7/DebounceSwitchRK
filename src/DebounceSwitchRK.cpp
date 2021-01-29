@@ -1,5 +1,9 @@
 #include "DebounceSwitchRK.h"
 
+// Switch Debouncing Library for Particle devices
+// Repository: https://github.com/rickkas7/DebounceSwitchRK
+// License: MIT
+
 // [static] 
 DebounceSwitch *DebounceSwitch::instance = 0;
 
@@ -84,7 +88,8 @@ DebounceSwitchState *DebounceSwitch::addSwitch(pin_t pin, DebounceSwitchStyle st
         }
     }
 
-    DebounceSwitchState *state = new DebounceSwitchState(pin, style, callback, context, pollCallback, pollContext);
+    DebounceSwitchState *state = new DebounceSwitchState(pin, style, (DebounceConfiguration *)this, 
+        callback, context, pollCallback, pollContext);
     if (!state) {
         return NULL;
     }
@@ -115,12 +120,14 @@ bool DebounceSwitch::gpioPoll(DebounceSwitchState *switchState, void *context) {
     return bResult;
 }
 
-DebounceSwitchState::DebounceSwitchState(pin_t pin, DebounceSwitchStyle style,
+DebounceSwitchState::DebounceSwitchState(pin_t pin, DebounceSwitchStyle style, DebounceConfiguration *config, 
     std::function<void(DebounceSwitchState *switchState, void *context)> callback, void *context, 
     std::function<bool(DebounceSwitchState *switchState, void *pollContext)> pollCallback, void *pollContext) :
     pin(pin), style(style), callback(callback), context(context), 
     pollCallback(pollCallback), pollContext(pollContext)
 {
+    *(DebounceConfiguration *)this = *config;
+
     if (style == DebounceSwitchStyle::TOGGLE || 
         style == DebounceSwitchStyle::TOGGLE_PULLDOWN ||
         style == DebounceSwitchStyle::TOGGLE_PULLUP) {
@@ -174,7 +181,7 @@ void DebounceSwitchState::run() {
         break;
 
     case DebouncePressState::PRESS_START:
-        if (DebounceSwitch::getInstance()->getLongPressMs() == 0) {
+        if (longPressMs == 0) {
             // LONG press is disabled, which also implies very long
             // is disabled. Just generate SHORT and RELEASED.
             setPressState(DebouncePressState::SHORT, true);            
@@ -182,8 +189,8 @@ void DebounceSwitchState::run() {
             sequenceCount++;
             break;
         }
-        if ((millis() - pressMs) >= DebounceSwitch::getInstance()->getLongPressMs()) {
-            if (DebounceSwitch::getInstance()->getVeryLongPressMs() == 0) {
+        if ((millis() - pressMs) >= longPressMs) {
+            if (veryLongPressMs == 0) {
                 // Very long press is not used, generate the LONG state and
                 // wait. PROGRESS and VERY_LONG will not be generated.
                 setPressState(DebouncePressState::LONG, true);            
@@ -207,7 +214,7 @@ void DebounceSwitchState::run() {
         break;
 
     case DebouncePressState::PROGRESS:
-        if ((millis() - pressMs) >= DebounceSwitch::getInstance()->getVeryLongPressMs()) {
+        if ((millis() - pressMs) >= veryLongPressMs) {
             setPressState(DebouncePressState::VERY_LONG, true);            
             break;
         }
@@ -231,7 +238,7 @@ void DebounceSwitchState::run() {
         break;
 
     case DebouncePressState::RELEASED:
-        if ((millis() - releaseMs) >= DebounceSwitch::getInstance()->getInterTapMs()) {
+        if ((millis() - releaseMs) >= interTapMs) {
             // Send out the total number of taps
             if (sequenceCount > 0) {
                 setPressState(DebouncePressState::TAP, true);
@@ -279,7 +286,15 @@ void DebounceSwitchState::checkDebounce() {
     }
     else {
         // Signal state changed
-        if ((millis() - debounceLastSameMs) >= DebounceSwitch::getInstance()->getDebounceMs()) {
+        unsigned long debounceMs;
+        if (isPressed()) {
+            debounceMs = debounceReleaseMs;
+        }
+        else {
+            debounceMs = debouncePressMs;
+        }
+
+        if ((millis() - debounceLastSameMs) >= debounceMs) {
             // Timer expired
             debouncedLastSignal = lastSignal;
         }
@@ -336,4 +351,14 @@ const char *DebounceSwitchState::getPressStateName(DebouncePressState pressState
 // [static]
 DebouncePressState DebounceSwitchState::signalToPressState(bool signal) {
     return signal ? DebouncePressState::TOGGLE_HIGH : DebouncePressState::TOGGLE_LOW;
+}
+
+
+DebounceConfiguration &DebounceConfiguration::operator=(const DebounceConfiguration &src) {
+    this->debouncePressMs = src.debouncePressMs;
+    this->debounceReleaseMs = src.debounceReleaseMs;
+    this->interTapMs = src.interTapMs;
+    this->longPressMs = src.longPressMs;
+    this->veryLongPressMs = src.veryLongPressMs;
+    return *this;
 }

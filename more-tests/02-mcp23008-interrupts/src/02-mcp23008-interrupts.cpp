@@ -35,13 +35,14 @@ void setup() {
     DebounceSwitchState *sw = DebounceSwitch::getInstance()->addNotifySwitch(DebounceSwitchStyle::PRESS_LOW, 
         [](DebounceSwitchState *switchState, void *) {
             // Called to notify of switch operations
-            Log.info("pin=%d state=%s", switchState->getPin(), switchState->getPressStateName());
+            Log.info("state=%s", switchState->getPressStateName());
             if (switchState->getPressState() == DebouncePressState::TAP) {
                 Log.info("%d taps", switchState->getTapCount());
             }
         }, NULL);
 
-    gpio.attachInterrupt(SWITCH_PIN, CHANGE, [sw](bool bValue) {
+    gpio.attachInterrupt(SWITCH_PIN, CHANGE, 
+        [sw](bool bValue) {
         // This code runs in a worker thread with a 1024 byte stack, so avoid doing
         // anything that requires a long time or stack here.
         // Log.info("bValue=%d", bValue);
