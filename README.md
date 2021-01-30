@@ -14,6 +14,8 @@ Library for switch debouncing for Particle devices
 - Works with both polling (default) and notify-on-change (handy for I2C GPIO with interrupts).
 - Many configurable parameters.
 
+The full browsable API documentation is available [here](https://rickkas7.github.io/DebounceSwitchRK/index.html) as well as in the docs/html directory in the [Github Repository](https://github.com/rickkas7/DebounceSwitchRK).
+
 ## General Design
 
 
@@ -57,6 +59,8 @@ void YourClass::callback(DebounceSwitchState *switchState);
 
 The callback is called from a worker thread with a small (1024 byte) stack, so you should avoid
 doing operations which block or use a lot of stack space.
+
+Returning as quickly as possible without blocking is the best. If you must block, make sure you don't block more than 5 milliseconds total or the debouncing of the buttons and performance will be affected.
 
 ### Polling Callback
 

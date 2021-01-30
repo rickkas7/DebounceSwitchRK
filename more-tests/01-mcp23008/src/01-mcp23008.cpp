@@ -23,7 +23,8 @@ void setup() {
     gpio.begin();
     gpio.pinMode(2, INPUT_PULLUP);
 
-    DebounceSwitch::getInstance()->addVirtualSwitch(DebounceSwitchStyle::PRESS_LOW, 
+    DebounceSwitch::getInstance()->addSwitch(
+        DebounceSwitch::NOTIFY_PIN, DebounceSwitchStyle::PRESS_LOW, 
         [](DebounceSwitchState *switchState, void *) {
             // Called to notify of switch operations
             Log.info("pin=%d state=%s", switchState->getPin(), switchState->getPressStateName());
